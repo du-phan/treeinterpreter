@@ -8,6 +8,7 @@ class tree_interpreter:
         
         self.model = model
         self.paths = []
+        self.caches = {}
         
         if (isinstance(model, ForestClassifier) or isinstance(model, ForestRegressor)):
             self._collect_forest_paths()
@@ -54,9 +55,13 @@ class tree_interpreter:
         that prediction ≈ bias + feature_contributions.
         """
         leaves = self.model.estimators_[tree_index].apply(X) if tree_index is not None else self.model.apply(X)
+        if leaves.tobytes() in self.caches: 
+            return self.caches[leaves.tobytes()]
+        
         paths = self.paths[tree_index] if tree_index is not None else self.paths
         model = self.model.estimators_[tree_index] if tree_index is not None else self.model
                 
+            
         for path in paths:
             path.reverse()
 
@@ -102,6 +107,7 @@ class tree_interpreter:
                     #path_features.sort()
                     contributions[row][tuple(sorted(path_features))] = \
                         contributions[row].get(tuple(sorted(path_features)), 0) + contrib
+            self.caches[leaves.tobytes()] = (direct_prediction, biases, contributions)
             return direct_prediction, biases, contributions
 
         else:
@@ -123,7 +129,8 @@ class tree_interpreter:
 
             for row, leaf in enumerate(leaves):
                 contributions.append(unique_contributions[leaf])
-
+                
+            self.caches[leaves.tobytes()] = (direct_prediction, biases, np.array(contributions))
             return direct_prediction, biases, np.array(contributions)
 
 
